@@ -6,6 +6,7 @@ from TimeRecorder import TimeRecorder
 from IntersectionIndexer import create_intersection_index
 from tqdm import tqdm  # 添加tqdm库
 
+
 class AntColonyOptimizer:
     def __init__(self, graph, num_ants, evaporation_rate, iterations):
         """
@@ -57,12 +58,12 @@ class AntColonyOptimizer:
         else:
             return None  # 如果当前节点是路径的起点，则没有上一个节点
 
-    def can_turn(self, current_node, next_node, traffic_mode, path):
+    def can_turn(self, current_node_index, next_node_index, traffic_mode, path):
         """
         根据交通规则判断是否可以从当前节点转向下一个节点。
 
-        :param current_node: 当前节点。
-        :param next_node: 下一个节点。
+        :param current_node_index: 当前节点的索引。
+        :param next_node_index: 下一个节点的索引。
         :param traffic_mode: 交通模式，1代表自由转弯，2代表限制转弯。
         :param path: 蚂蚁走过的路径。
         :return: 是否可以转向。
@@ -70,14 +71,20 @@ class AntColonyOptimizer:
         if traffic_mode == 1:  # 自由转弯模式
             return True
         elif traffic_mode == 2:  # 限制转弯模式
-            prev_node = self.get_previous_node(current_node, path)
-            if prev_node is None:
+            # 获取上一个节点的索引
+            prev_node_index = self.get_previous_node(current_node_index, path)
+            if prev_node_index is None:
                 return True  # 如果没有上一个节点，说明这是路径的起点，可以自由转弯
 
+            # 确认节点存在并且有'coord'属性
+            if prev_node_index not in self.graph.nodes or 'coord' not in self.graph.nodes[prev_node_index]:
+                print(f"Error: Node {prev_node_index} not found or 'coord' attribute missing.")
+            return False  # 或根据您的需求进行其他错误处理
+
             # 获取节点的坐标
-            prev_coord = self.graph.nodes[prev_node]['coord']
-            curr_coord = self.graph.nodes[current_node]['coord']
-            next_coord = self.graph.nodes[next_node]['coord']
+            prev_coord = self.graph.nodes[prev_node_index]['coord']
+            curr_coord = self.graph.nodes[current_node_index]['coord']
+            next_coord = self.graph.nodes[next_node_index]['coord']
 
             # 计算夹角
             angle = self.calculate_angle(prev_coord, curr_coord, next_coord)
@@ -135,7 +142,7 @@ class AntColonyOptimizer:
             pheromone_level = self.pheromone[(current_node_index, neighbor_index)]
             pheromone_list.append(pheromone_level)
 
-            if self.can_turn(current_node_coords, neighbor, traffic_mode, path):
+            if self.can_turn(current_node_index, neighbor_index, traffic_mode, path):
                 edge_length = self.graph.edges[current_node_coords, neighbor]['length']
                 travel_time = self.time_recorder.calculate_travel_time(edge_length)
                 self.time_recorder.update_relative_time(travel_time)  # 更新相对时间
@@ -184,7 +191,7 @@ class AntColonyOptimizer:
             iteration_durations = []
 
             for ant in range(self.num_ants):
-                path, total_duration = self.find_path(start_index, end_index, traffic_mode=1)
+                path, total_duration = self.find_path(start_index, end_index, traffic_mode=2)
                 iteration_paths.append(path)
                 iteration_durations.append(total_duration)
 
