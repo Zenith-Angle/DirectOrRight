@@ -8,7 +8,7 @@ def create_network_from_shp(filepath):
     gdf = gpd.read_file(filepath)
 
     # 创建空的Graph对象
-    G = nx.DiGraph()
+    G = nx.Graph()  # 创建无向图
 
     node_id = 0
     node_map = {}
@@ -23,7 +23,7 @@ def create_network_from_shp(filepath):
 
             if start_point not in node_map:
                 node_map[start_point] = node_id
-                G.add_node(node_id, coord=start_point)
+                G.add_node(node_id, coord=str(start_point))  # 将坐标转换为字符串
                 start_node_id = node_id
                 node_id += 1
             else:
@@ -31,14 +31,14 @@ def create_network_from_shp(filepath):
 
             if end_point not in node_map:
                 node_map[end_point] = node_id
-                G.add_node(node_id, coord=end_point)
+                G.add_node(node_id, coord=str(end_point))  # 将坐标转换为字符串
                 end_node_id = node_id
                 node_id += 1
             else:
                 end_node_id = node_map[end_point]
 
             distance = geom.length
-            G.add_edge(start_node_id, end_node_id, weight=distance)
+            G.add_edge(start_node_id, end_node_id, length=distance)  # 只添加length属性
 
     return G
 
@@ -46,10 +46,14 @@ def create_network_from_shp(filepath):
 filepath = 'data/streets.shp'
 G = create_network_from_shp(filepath)
 
-# 演示如何访问节点坐标
+# 将图写入到新的文件中
+nx.write_graphml(G, 'data/PAR.graphml')
+
+'''# 演示如何访问节点坐标
 for node in G.nodes(data=True):
     print(f"Node {node[0]}: Coord = {node[1]['coord']}")
 
 # 演示如何访问边的权重
 for edge in G.edges(data=True):
     print(f"Edge from {edge[0]} to {edge[1]}: Weight = {edge[2]['weight']}")
+'''
