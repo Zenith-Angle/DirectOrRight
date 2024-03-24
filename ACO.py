@@ -5,22 +5,89 @@ import networkx as nx
 from TimeRecorder import TimeRecorder
 from IntersectionIndexer import create_intersection_index
 from tqdm import tqdm  # 添加tqdm库
+import xml.etree.ElementTree as ET
 
 
 def create_intersection_index(graph):
+    """
+    创建交叉点索引和边长数据。
+
+    参数:
+    - graph: 包含节点和边的数据结构，节点需包含'd0'属性表示坐标，边需包含'd1'属性表示长度。
+
+    返回:
+    - intersection_index: 字典，键为交叉点的坐标字符串，值为交叉点的坐标。
+    - edge_data: 字典，键为边的节点对，值为边的长度。
+    """
     intersection_index = {}
     edge_data = {}
+
+    # 为每个具有'd0'属性的节点创建交叉点索引
     for node, data in graph.nodes(data=True):
-        if 'd0' in data:  # 确保节点有'd0'属性
-            coords = data['d0'].split(',')
-            intersection_index[str((float(coords[0]), float(coords[1])))] = (
-                float(coords[0]), float(coords[1]))  # 使用坐标字符串作为键
-    print("Intersection Index: ", intersection_index)  # 打印intersection_index
+        if 'd0' in data:
+            print(f"Original 'd0' value for node {node}: {data['d0']}")  # 打印原始的 'd0' 值
+            coords = data['d0'].replace('(', '').replace(')', '').split(',')
+            print(f"Split 'd0' value for node {node}: {coords}")  # 打印分割后的 'd0' 值
+            try:
+                coord_tuple = (float(coords[0]), float(coords[1]))
+                print(f"Converted 'd0' value for node {node}: {coord_tuple}")  # 打印转换后的 'd0' 值
+                intersection_index[str(coord_tuple)] = coord_tuple
+            except ValueError as e:
+                print(f"Error converting 'd0' value for node {node}: {e}")  # 打印转换错误
+        else:
+            print(f"Node {node} does not have 'd0' attribute")  # 打印没有 'd0' 属性的节点
+
+    # 打印交叉点索引
+    print("Intersection Index: ", intersection_index)
+
+    # 为每条具有'd1'属性的边记录边长
     for edge in graph.edges(data=True):
-        if 'd1' in edge[2]:  # 确保边有'd1'属性
+        if 'd1' in edge[2]:
             length = edge[2]['d1']
-            edge_data[(edge[0], edge[1])] = length  # 使用长度作为键
+            edge_data[(edge[0], edge[1])] = length
+
     return intersection_index, edge_data
+
+
+def read_graphml_with_keys(file_path, keys):
+    """
+    从 GraphML 文件中读取图数据。
+
+    :param file_path: GraphML 文件的路径
+    :param keys: 需要读取的节点或边数据的键名列表
+    :return: 一个包含图数据的 NetworkX 图形对象，其中只包含指定键的数据
+    """
+    # 解析 GraphML 文件为 XML 树结构
+    tree = ET.parse(file_path)
+    root = tree.getroot()
+
+    # 初始化一个空的无向图
+    graph = nx.Graph()
+
+    # 遍历 XML 中的所有节点，将它们添加到图中
+    for node in root.iter('{http://graphml.graphdrawing.org/xmlns}node'):
+        id = node.attrib['id']  # 节点ID
+        data_dict = {}  # 存储节点数据的字典
+        for data in node.iter('{http://graphml.graphdrawing.org/xmlns}data'):
+            if data.attrib['key'] in keys:  # 如果键在需要读取的键名列表中
+                # 收集节点的数据
+                data_dict[data.attrib['key']] = data.text
+        # 将节点及其数据添加到图中
+        graph.add_node(id, **data_dict)
+
+    # 遍历 XML 中的所有边，将它们添加到图中
+    for edge in root.iter('{http://graphml.graphdrawing.org/xmlns}edge'):
+        source = edge.attrib['source']  # 边的源节点ID
+        target = edge.attrib['target']  # 边的目标节点ID
+        data_dict = {}  # 存储边数据的字典
+        for data in edge.iter('{http://graphml.graphdrawing.org/xmlns}data'):
+            if data.attrib['key'] in keys:  # 如果键在需要读取的键名列表中
+                # 收集边的数据
+                data_dict[data.attrib['key']] = data.text
+        # 将边及其数据添加到图中
+        graph.add_edge(source, target, **data_dict)
+
+    return graph
 
 
 
@@ -39,16 +106,12 @@ class AntColonyOptimizer:
         self.pheromone = {}
 
         for edge in self.graph.edges():
-            try:
-                if 'coord' in self.graph.nodes[edge[0]] and 'coord' in self.graph.nodes[edge[1]]:
-                    start_key = str(self.graph.nodes[edge[0]]['coord'])
-                    end_key = str(self.graph.nodes[edge[1]]['coord'])
-                    mid_point = self.calculate_mid_point(self.intersection_index[start_key],self.intersection_index[end_key])
-                else:
-                    print(f"Missing 'coord' for edge {edge}")
-                    continue  # 跳过这个边
-            except KeyError as e:
-                print(f"KeyError for edge {edge}: {e}")  # 打印出问题的边和错误信息
+            if 'coord' in self.graph.nodes[edge[0]] and 'coord' in self.graph.nodes[edge[1]]:
+                start_key = str(self.graph.nodes[edge[0]]['coord'])
+                end_key = str(self.graph.nodes[edge[1]]['coord'])
+                mid_point = self.calculate_mid_point(self.intersection_index[start_key],
+                                                     self.intersection_index[end_key])
+            else:
                 continue  # 跳过这个边
 
     def select_start_end_points(self):
@@ -342,7 +405,7 @@ class AntColonyOptimizer:
 if __name__ == "__main__":
     # 载入图形数据
     graph_path = 'data/PAR.graphml'  # 替换为实际的文件路径
-    G = nx.read_graphml(graph_path)
+    G = read_graphml_with_keys('data/PAR.graphml', ['d0', 'd1'])
 
     # 创建蚁群优化器实例
     aco = AntColonyOptimizer(G, num_ants=50, evaporation_rate=0.25, iterations=100)
