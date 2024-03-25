@@ -8,55 +8,8 @@ from tqdm import tqdm  # 添加tqdm库
 import xml.etree.ElementTree as ET
 
 
-def create_intersection_index(graph):
-    """
-    创建交叉点索引和边长数据。
-
-    参数:
-    - graph: 包含节点和边的数据结构，节点需包含'd0'属性表示坐标，边需包含'd1'属性表示长度。
-
-    返回:
-    - intersection_index: 字典，键为交叉点的坐标字符串，值为交叉点的坐标。
-    - edge_data: 字典，键为边的节点对，值为边的长度。
-    """
-    intersection_index = {}
-    edge_data = {}
-
-    # 为每个具有'd0'属性的节点创建交叉点索引
-    for node, data in graph.nodes(data=True):
-        if 'd0' in data:
-            print(f"Original 'd0' value for node {node}: {data['d0']}")  # 打印原始的 'd0' 值
-            coords = data['d0'].replace('(', '').replace(')', '').split(',')
-            print(f"Split 'd0' value for node {node}: {coords}")  # 打印分割后的 'd0' 值
-            try:
-                coord_tuple = (float(coords[0]), float(coords[1]))
-                print(f"Converted 'd0' value for node {node}: {coord_tuple}")  # 打印转换后的 'd0' 值
-                intersection_index[str(coord_tuple)] = coord_tuple
-            except ValueError as e:
-                print(f"Error converting 'd0' value for node {node}: {e}")  # 打印转换错误
-        else:
-            print(f"Node {node} does not have 'd0' attribute")  # 打印没有 'd0' 属性的节点
-
-    # 打印交叉点索引
-    print("Intersection Index: ", intersection_index)
-
-    # 为每条具有'd1'属性的边记录边长
-    for edge in graph.edges(data=True):
-        if 'd1' in edge[2]:
-            length = edge[2]['d1']
-            edge_data[(edge[0], edge[1])] = length
-
-    return intersection_index, edge_data
-
 
 def read_graphml_with_keys(file_path, keys):
-    """
-    从 GraphML 文件中读取图数据。
-
-    :param file_path: GraphML 文件的路径
-    :param keys: 需要读取的节点或边数据的键名列表
-    :return: 一个包含图数据的 NetworkX 图形对象，其中只包含指定键的数据
-    """
     # 解析 GraphML 文件为 XML 树结构
     tree = ET.parse(file_path)
     root = tree.getroot()
@@ -71,7 +24,10 @@ def read_graphml_with_keys(file_path, keys):
         for data in node.iter('{http://graphml.graphdrawing.org/xmlns}data'):
             if data.attrib['key'] in keys:  # 如果键在需要读取的键名列表中
                 # 收集节点的数据
-                data_dict[data.attrib['key']] = data.text
+                if data.attrib['key'] == 'd0':
+                    data_dict['coord'] = data.text
+                else:
+                    data_dict[data.attrib['key']] = data.text
         # 将节点及其数据添加到图中
         graph.add_node(id, **data_dict)
 
@@ -83,26 +39,42 @@ def read_graphml_with_keys(file_path, keys):
         for data in edge.iter('{http://graphml.graphdrawing.org/xmlns}data'):
             if data.attrib['key'] in keys:  # 如果键在需要读取的键名列表中
                 # 收集边的数据
-                data_dict[data.attrib['key']] = data.text
+                if data.attrib['key'] == 'd1':
+                    data_dict['length'] = data.text
+                else:
+                    data_dict[data.attrib['key']] = data.text
         # 将边及其数据添加到图中
         graph.add_edge(source, target, **data_dict)
 
     return graph
 
 
+def create_intersection_index(graph):
+    intersection_index = {}
+    edge_data = {}
+
+    for node, data in graph.nodes(data=True):
+        if 'coord' in data:
+            coord_tuple = tuple(map(float, data['coord'].strip('()').split(',')))
+            intersection_index[str(coord_tuple)] = coord_tuple
+
+    for edge in graph.edges(data=True):
+        if 'length' in edge[2]:
+            length = float(edge[2]['length'])
+            edge_data[(edge[0], edge[1])] = length
+
+    return intersection_index, edge_data
+
+
 
 class AntColonyOptimizer:
     def __init__(self, graph, num_ants, evaporation_rate, iterations):
-        """
-        初始化蚁群优化算法。
-        """
         self.graph = graph
         self.num_ants = num_ants
-        self.evaporation_rate = 0.15  # 降低蒸发率到 0.15
+        self.evaporation_rate = evaporation_rate
         self.iterations = iterations
         self.time_recorder = TimeRecorder()
         self.intersection_index, self.edge_data = create_intersection_index(graph)
-        # 初始化信息素，确保边的每个节点都使用了正确的索引
         self.pheromone = {}
 
         for edge in self.graph.edges():
@@ -112,7 +84,7 @@ class AntColonyOptimizer:
                 mid_point = self.calculate_mid_point(self.intersection_index[start_key],
                                                      self.intersection_index[end_key])
             else:
-                continue  # 跳过这个边
+                continue
 
     def select_start_end_points(self):
         """
@@ -136,8 +108,7 @@ class AntColonyOptimizer:
                 and isinstance(self.intersection_index[end_key], (list, tuple))):
             raise ValueError("Intersection index values for selected nodes must be lists or tuples.")
 
-        return self.intersection_index[start_key], self.intersection_index[end_key]
-
+        return start, end
     def initialize_pheromone(self):
         """
         在起点和终点连线上初始化更多信息素。
@@ -235,17 +206,17 @@ class AntColonyOptimizer:
             # 判断是否是直行或右转
             return 160 <= angle <= 180 or 80 <= angle <= 100  # 这里的角度范围可以根据实际情况调整
 
-    def find_path(self, start_index, end_index, traffic_mode):
+    def find_path(self, start_id, end_id, traffic_mode):
         """
         对于每只蚂蚁寻找从起点到终点的路径。
 
-        :param start_index: 路径的起点索引。
-        :param end_index: 路径的终点索引。
+        :param start_id: 路径的起点ID。
+        :param end_id: 路径的终点ID。
         :param traffic_mode: 交通模式。
         :return: 路径列表和总时长。
         """
-        path = [start_index]  # 使用起点索引初始化路径
-        current_node = list(self.graph.nodes())[start_index]  # 当前节点为起始节点
+        path = [start_id]  # 使用起点ID初始化路径
+        current_node = start_id  # 当前节点为起始节点
 
         total_duration = 0  # 总时长，包括行驶时间和路口等待时间
         max_iterations = 100  # 设置最大迭代次数以避免无限循环
@@ -255,12 +226,12 @@ class AntColonyOptimizer:
             if next_node is None or next_node == current_node:
                 # 如果无法找到新的节点或返回到相同的节点，终止搜索
                 break
-            path.append(next_node)  # 添加节点的索引到路径中
+            path.append(next_node)  # 添加节点的ID到路径中
             total_duration += duration  # 累加总时长
-            current_node = list(self.graph.nodes())[next_node]  # 更新当前节点
-            if current_node == list(self.graph.nodes())[end_index]:
+            current_node = next_node  # 更新当前节点
+            if current_node == end_id:
                 break  # 如果到达终点，终止循环
-        return path, total_duration  # 返回路径（索引列表）
+        return path, total_duration  # 返回路径（ID列表）
 
     def select_next_node(self, current_node, path, traffic_mode):
         neighbors = list(self.graph.neighbors(current_node))
@@ -315,7 +286,7 @@ class AntColonyOptimizer:
         wait_time = vehicle_count * 0.5  # 每辆车增加0.5分钟的等待时间
         return wait_time
 
-    def run(self, start_index, end_index):
+    def run(self, start_id, end_id):
         best_path = None
         best_duration = float('inf')
         first_path_found = None
@@ -325,15 +296,15 @@ class AntColonyOptimizer:
             iteration_durations = []
 
             for ant in range(self.num_ants):
-                path, total_duration = self.find_path(start_index, end_index, traffic_mode=1)
+                path, total_duration = self.find_path(start_id, end_id, traffic_mode=1)
                 iteration_paths.append(path)
                 iteration_durations.append(total_duration)
 
                 if first_path_found is None:
                     first_path_found = {
-                        'start': start_index,
-                        'end': end_index,
                         'path': path,
+                        'start': start_id,
+                        'end': end_id,
                         'duration': total_duration
                     }
 
@@ -345,13 +316,11 @@ class AntColonyOptimizer:
 
         if first_path_found:
             print(f"First path found: {first_path_found['path']}")
-            print(f"Start node index: {first_path_found['start']}, End node index: {first_path_found['end']}")
+            print(f"Start node ID: {first_path_found['start']}, End node ID: {first_path_found['end']}")
             print(f"Duration: {first_path_found['duration']} hours")
 
         if best_path:
             total_travel_time, total_wait_time = self.time_recorder.simulate_path(best_path, self.graph)
-            '''total_travel_time = self.time_recorder.get_total_travel_time(best_path, self.graph)
-            total_wait_time = self.time_recorder.get_total_wait_time(best_path)'''
             total_duration = total_travel_time + total_wait_time
 
             print(f"最佳路径: {best_path}")
@@ -363,6 +332,7 @@ class AntColonyOptimizer:
         print("路口通行时间记录：")
         for intersection, times in self.time_recorder.intersection_times.items():
             print(f"路口 {intersection}: 通行时间 {times}")
+
 
     def update_pheromone(self, paths, durations):
         """
