@@ -67,3 +67,14 @@ def read_graphml_with_keys(file_path, keys):
 这个部分完成了读取，并且在Intersection Index中似乎也填充了数据。
 
 目前已有的问题是，似乎有字符串转换的问题，并且报错keyerror:coord
+
+
+
+# time:2024/3/25 20:43
+
+这次，将图中表示坐标的d0和表示长度的d1改成了coord和length
+
+统一了在使用过程中，索引和点的id的冲突问题，保留使用了点的id
+
+目前的报错显示，似乎由于你在初始化 pheromone 字典时，没有为所有可能的边添加键值对。需要确保在初始化 pheromone
+字典时，为图中的每一条边添加一个键值对。 
