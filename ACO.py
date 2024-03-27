@@ -115,9 +115,18 @@ class AntColonyOptimizer:
         """
         start, end = self.select_start_end_points()  # 获取起点和终点坐标
         for edge in self.graph.edges():
-            mid_point = self.calculate_mid_point(self.intersection_index[edge[0]], self.intersection_index[edge[1]])
-            distance = self.calculate_distance_to_line(start, end, mid_point)
-            self.pheromone[edge] *= (1 / (1 + distance))  # 距离越短，信息素量越大
+            if 'coord' in self.graph.nodes[edge[0]] and 'coord' in self.graph.nodes[edge[1]]:
+                start_key = str(self.graph.nodes[edge[0]]['coord'])
+                end_key = str(self.graph.nodes[edge[1]]['coord'])
+                # 检查start_key和end_key是否在self.intersection_index中
+                if start_key not in self.intersection_index or end_key not in self.intersection_index:
+                    print(f"KeyError: {start_key} or {end_key} not found in intersection_index.")
+                    continue
+                mid_point = self.calculate_mid_point(self.intersection_index[start_key], self.intersection_index[end_key])
+                distance = self.calculate_distance_to_line(start, end, mid_point)
+                self.pheromone[(start_key, end_key)] = 1 / (1 + distance)  # 距离越短，信息素量越大
+                self.pheromone[(end_key, start_key)] = 1 / (1 + distance)  # 距离越短，信息素量越大
+
 
     def calculate_mid_point(self, start, end):
         """
@@ -244,11 +253,12 @@ class AntColonyOptimizer:
         pheromone_list = []
         for neighbor in neighbors:
             neighbor_key = str(self.graph.nodes[neighbor]['coord'])
-            pheromone_level = self.pheromone[(current_node_key, neighbor_key)]
+            # 如果键不存在于self.pheromone中，就为该键赋一个默认值
+            pheromone_level = self.pheromone.get((current_node_key, neighbor_key), 1.0)
             pheromone_list.append(pheromone_level)
 
             if self.can_turn(current_node_key, neighbor_key, traffic_mode, path):
-                edge_length = self.graph.edges[current_node, neighbor]['d1']  # 使用'd1'属性获取边的长度
+                edge_length = float(self.graph.edges[current_node, neighbor]['length'])
                 travel_time = self.time_recorder.calculate_travel_time(edge_length)
                 self.time_recorder.update_relative_time(travel_time)  # 更新相对时间
                 wait_time = self.time_recorder.calculate_wait_time(neighbor_key)
@@ -276,7 +286,6 @@ class AntColonyOptimizer:
         next_node = random.choices(neighbors, weights=probabilities, k=1)[0]
         next_node_key = str(self.graph.nodes[next_node]['coord'])
         return next_node_key, durations[neighbors.index(next_node)]
-
     def estimate_wait_time(self, current_node, next_node):
         """
         估算在路口的等待时间。
