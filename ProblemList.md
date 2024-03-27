@@ -82,3 +82,8 @@ def read_graphml_with_keys(file_path, keys):
 
 # time:2024/3/26 23:12
 今日无事
+
+# time:2024/3/28 00:07
+暂时解决了在select next node中出现的因为新旧代码数据不匹配导致的keyerror问题。r
+然而目前又出现了新的networkx.exception.NetworkXError: The node (596800.6249627918, 2427381.499959573) is not in the
+graph.
