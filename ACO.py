@@ -84,6 +84,8 @@ class AntColonyOptimizer:
             else:
                 continue
 
+        # 在这里调用 initialize_pheromone 方法
+        self.initialize_pheromone()
     def select_start_end_points(self):
         """
         随机选择起点和终点。
@@ -112,7 +114,9 @@ class AntColonyOptimizer:
         """
         在起点和终点连线上初始化更多信息素。
         """
-        start, end = self.select_start_end_points()  # 获取起点和终点坐标
+        start_id, end_id = self.select_start_end_points()  # 获取起点和终点ID
+        start = self.graph.nodes[start_id]['coord']  # 获取起点坐标
+        end = self.graph.nodes[end_id]['coord']  # 获取终点坐标
         for edge in self.graph.edges():
             if 'coord' in self.graph.nodes[edge[0]] and 'coord' in self.graph.nodes[edge[1]]:
                 start_key = str(self.graph.nodes[edge[0]]['coord'])
@@ -127,7 +131,6 @@ class AntColonyOptimizer:
                 self.pheromone[(start_key, end_key)] = 1 / (1 + distance)  # 距离越短，信息素量越大
                 self.pheromone[(end_key, start_key)] = 1 / (1 + distance)  # 距离越短，信息素量越大
         print("Information pheromone initialization completed.")
-
 
 
     def calculate_mid_point(self, start, end):
