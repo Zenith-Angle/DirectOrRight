@@ -87,3 +87,15 @@ def read_graphml_with_keys(file_path, keys):
 暂时解决了在select next node中出现的因为新旧代码数据不匹配导致的keyerror问题。r
 然而目前又出现了新的networkx.exception.NetworkXError: The node (596800.6249627918, 2427381.499959573) is not in the
 graph.
+
+
+
+# time:2024/3/28 13:37
+本次将select next node中的节点访问方式从坐标改为了id
+不过在update_pheromone中，好像还是有问题
+
+看起来目前代码中对于节点的访问有很多冲突矛盾的部分，这是需要解决的问题
+
+# time:2024/3/29 00:03
+全新报错：ValueError: too many values to unpack (expected 2)
+原因不明
