@@ -8,7 +8,6 @@ from tqdm import tqdm  # 添加tqdm库
 import xml.etree.ElementTree as ET
 
 
-
 def read_graphml_with_keys(file_path, keys):
     # 解析 GraphML 文件为 XML 树结构
     tree = ET.parse(file_path)
@@ -66,7 +65,6 @@ def create_intersection_index(graph):
     return intersection_index, edge_data
 
 
-
 class AntColonyOptimizer:
     def __init__(self, graph, num_ants, evaporation_rate, iterations):
         self.graph = graph
@@ -109,6 +107,7 @@ class AntColonyOptimizer:
             raise ValueError("Intersection index values for selected nodes must be lists or tuples.")
 
         return start, end
+
     def initialize_pheromone(self):
         """
         在起点和终点连线上初始化更多信息素。
@@ -122,10 +121,13 @@ class AntColonyOptimizer:
                 if start_key not in self.intersection_index or end_key not in self.intersection_index:
                     print(f"KeyError: {start_key} or {end_key} not found in intersection_index.")
                     continue
-                mid_point = self.calculate_mid_point(self.intersection_index[start_key], self.intersection_index[end_key])
+                mid_point = self.calculate_mid_point(self.intersection_index[start_key],
+                                                     self.intersection_index[end_key])
                 distance = self.calculate_distance_to_line(start, end, mid_point)
                 self.pheromone[(start_key, end_key)] = 1 / (1 + distance)  # 距离越短，信息素量越大
                 self.pheromone[(end_key, start_key)] = 1 / (1 + distance)  # 距离越短，信息素量越大
+        print("Information pheromone initialization completed.")
+
 
 
     def calculate_mid_point(self, start, end):
@@ -242,26 +244,24 @@ class AntColonyOptimizer:
                 break  # 如果到达终点，终止循环
         return path, total_duration  # 返回路径（ID列表）
 
-    def select_next_node(self, current_node, path, traffic_mode):
-        neighbors = list(self.graph.neighbors(current_node))
+
+    def select_next_node(self, current_node_id, path, traffic_mode):
+        neighbors = list(self.graph.neighbors(current_node_id))
         probabilities = []
         durations = []
 
-        current_node_key = str(self.graph.nodes[current_node]['coord'])
-
         # 收集信息素和时长
         pheromone_list = []
-        for neighbor in neighbors:
-            neighbor_key = str(self.graph.nodes[neighbor]['coord'])
+        for neighbor_id in neighbors:
             # 如果键不存在于self.pheromone中，就为该键赋一个默认值
-            pheromone_level = self.pheromone.get((current_node_key, neighbor_key), 1.0)
+            pheromone_level = self.pheromone.get((current_node_id, neighbor_id), 1.0)
             pheromone_list.append(pheromone_level)
 
-            if self.can_turn(current_node_key, neighbor_key, traffic_mode, path):
-                edge_length = float(self.graph.edges[current_node, neighbor]['length'])
+            if self.can_turn(current_node_id, neighbor_id, traffic_mode, path):
+                edge_length = float(self.graph.edges[current_node_id, neighbor_id]['length'])
                 travel_time = self.time_recorder.calculate_travel_time(edge_length)
                 self.time_recorder.update_relative_time(travel_time)  # 更新相对时间
-                wait_time = self.time_recorder.calculate_wait_time(neighbor_key)
+                wait_time = self.time_recorder.calculate_wait_time(neighbor_id)
                 total_duration = travel_time + wait_time
                 durations.append(total_duration)
             else:
@@ -271,7 +271,7 @@ class AntColonyOptimizer:
         total_pheromone = sum(pheromone_list)
         normalized_pheromones = [pheromone / total_pheromone for pheromone in pheromone_list]
 
-        for i, neighbor in enumerate(neighbors):
+        for i, neighbor_id in enumerate(neighbors):
             if durations[i] != float('inf'):
                 probability = normalized_pheromones[i] / durations[i] if durations[i] else 0
                 probabilities.append(probability)
@@ -283,9 +283,9 @@ class AntColonyOptimizer:
             return None, float('inf')
 
         # 选择下一个节点
-        next_node = random.choices(neighbors, weights=probabilities, k=1)[0]
-        next_node_key = str(self.graph.nodes[next_node]['coord'])
-        return next_node_key, durations[neighbors.index(next_node)]
+        next_node_id = random.choices(neighbors, weights=probabilities, k=1)[0]
+        return next_node_id, durations[neighbors.index(next_node_id)]
+
     def estimate_wait_time(self, current_node, next_node):
         """
         估算在路口的等待时间。
@@ -341,7 +341,6 @@ class AntColonyOptimizer:
         print("路口通行时间记录：")
         for intersection, times in self.time_recorder.intersection_times.items():
             print(f"路口 {intersection}: 通行时间 {times}")
-
 
     def update_pheromone(self, paths, durations):
         """
