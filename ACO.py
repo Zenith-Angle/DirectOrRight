@@ -146,11 +146,16 @@ class AntColonyOptimizer:
         """
         计算点到直线的距离。
 
-        :param start: 直线的起点坐标，一个包含两个元素的元组或列表。
-        :param end: 直线的终点坐标，一个包含两个元素的元组或列表。
-        :param point: 需要计算到直线距离的点的坐标，一个包含两个元素的元组或列表。
+        :param start: 直线的起点坐标。
+        :param end: 直线的终点坐标。
+        :param point: 需要计算到直线距离的点的坐标。
         :return: 点到直线的距离。
         """
+        # 验证输入参数
+        for param, name in [(start, 'start'), (end, 'end'), (point, 'point')]:
+            if not (isinstance(param, (list, tuple)) and len(param) == 2):
+                raise ValueError(f"参数{name}必须是包含两个元素的列表或元组，但得到: {param}")
+
         x1, y1 = start
         x2, y2 = end
         x0, y0 = point
