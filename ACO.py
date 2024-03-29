@@ -142,17 +142,25 @@ class AntColonyOptimizer:
 
         return ((start[0] + end[0]) / 2, (start[1] + end[1]) / 2)
 
-    @staticmethod
-    def calculate_distance_to_line(start, end, point):
+    def calculate_distance_to_line(self, start, end, point):
         """
         计算点到直线的距离。
+
+        :param start: 直线的起点坐标，一个包含两个元素的元组或列表。
+        :param end: 直线的终点坐标，一个包含两个元素的元组或列表。
+        :param point: 需要计算到直线距离的点的坐标，一个包含两个元素的元组或列表。
+        :return: 点到直线的距离。
         """
-        x0, y0 = point
         x1, y1 = start
         x2, y2 = end
+        x0, y0 = point
+
+        # 计算点到直线的距离
         num = abs((y2 - y1) * x0 - (x2 - x1) * y0 + x2 * y1 - y2 * x1)
         den = ((y2 - y1) ** 2 + (x2 - x1) ** 2) ** 0.5
-        return num / den
+        distance = num / den if den != 0 else float('inf')
+
+        return distance
 
     def calculate_angle(self, node1, node2, node3):
         """
