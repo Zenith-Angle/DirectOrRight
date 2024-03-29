@@ -99,3 +99,11 @@ graph.
 # time:2024/3/29 00:03
 全新报错：ValueError: too many values to unpack (expected 2)
 原因不明
+
+
+# time：2024/3/29 22:19
+目前看来，在calculate_distance_to_line这个函数中有很大的问题。
+
+
+# time:2024/3/30 
+目前，对于选择的线路的起点终点和初始化信息素时的每条线段的起点终点，有混淆，需要做出区分
