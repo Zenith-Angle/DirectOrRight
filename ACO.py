@@ -75,17 +75,11 @@ class AntColonyOptimizer:
         self.intersection_index, self.edge_data = create_intersection_index(graph)
         self.pheromone = {}
 
-        for edge in self.graph.edges():
-            if 'coord' in self.graph.nodes[edge[0]] and 'coord' in self.graph.nodes[edge[1]]:
-                start_key = str(self.graph.nodes[edge[0]]['coord'])
-                end_key = str(self.graph.nodes[edge[1]]['coord'])
-                mid_point = self.calculate_mid_point(self.intersection_index[start_key],
-                                                     self.intersection_index[end_key])
-            else:
-                continue
+
 
         # 在这里调用 initialize_pheromone 方法
         self.initialize_pheromone()
+
     def select_start_end_points(self):
         """
         随机选择起点和终点。
@@ -96,76 +90,50 @@ class AntColonyOptimizer:
         while end == start:
             end = random.choice(nodes)
 
-        # 确保start和end在intersection_index中对应的值是坐标列表或元组
-        # 添加检查以确保start和end作为键存在于self.intersection_index中
-        start_key = str(self.graph.nodes[start]['coord'])
-        end_key = str(self.graph.nodes[end]['coord'])
-        if start_key not in self.intersection_index or end_key not in self.intersection_index:
-            raise KeyError(
-                f"One or both of the selected points {start_key} or {end_key} do not exist in intersection_index.")
+        # 直接使用节点ID作为起点和终点的标识，无需转换为字符串形式的坐标
+        # 确保start和end对应的节点在图中确实存在
+        if start not in self.graph.nodes() or end not in self.graph.nodes():
+            raise KeyError(f"One or both of the selected nodes {start} or {end} do not exist in the graph.")
 
-        if not (isinstance(self.intersection_index[start_key], (list, tuple))
-                and isinstance(self.intersection_index[end_key], (list, tuple))):
-            raise ValueError("Intersection index values for selected nodes must be lists or tuples.")
+        # 检查起点和终点是否有坐标信息，如果坐标信息是必要的
+        if 'coord' not in self.graph.nodes[start] or 'coord' not in self.graph.nodes[end]:
+            raise ValueError("Selected nodes must have 'coord' attribute.")
 
         return start, end
 
     def initialize_pheromone(self):
         """
-        在起点和终点连线上初始化更多信息素。
+        在所有边上初始化信息素。
         """
-        start_id, end_id = self.select_start_end_points()  # 获取起点和终点ID
-        start = self.graph.nodes[start_id]['coord']  # 获取起点坐标
-        end = self.graph.nodes[end_id]['coord']  # 获取终点坐标
-        for edge in self.graph.edges():
-            if 'coord' in self.graph.nodes[edge[0]] and 'coord' in self.graph.nodes[edge[1]]:
-                start_key = str(self.graph.nodes[edge[0]]['coord'])
-                end_key = str(self.graph.nodes[edge[1]]['coord'])
-                # 检查start_key和end_key是否在self.intersection_index中
-                if start_key not in self.intersection_index or end_key not in self.intersection_index:
-                    print(f"KeyError: {start_key} or {end_key} not found in intersection_index.")
-                    continue
-                mid_point = self.calculate_mid_point(self.intersection_index[start_key],
-                                                     self.intersection_index[end_key])
-                distance = self.calculate_distance_to_line(start, end, mid_point)
-                self.pheromone[(start_key, end_key)] = 1 / (1 + distance)  # 距离越短，信息素量越大
-                self.pheromone[(end_key, start_key)] = 1 / (1 + distance)  # 距离越短，信息素量越大
+        # 首先，选择全局起点和终点用于计算直线，这部分不变
+        start_id, end_id = self.select_start_end_points()
+        start_coord = self.graph.nodes[start_id]['coord']  # 起点坐标
+        end_coord = self.graph.nodes[end_id]['coord']  # 终点坐标
+
+        # 然后，遍历图中的所有边，针对每条边计算中点并初始化信息素
+        for edge in self.graph.edges(data=True):
+            source, target = edge[:2]  # 获取边的两个端点的ID
+
+            # 从图中获取端点坐标
+            source_coord = self.graph.nodes[source]['coord']
+            target_coord = self.graph.nodes[target]['coord']
+
+            # 计算边的中点
+            mid_point = ((source_coord[0] + target_coord[0]) / 2, (source_coord[1] + target_coord[1]) / 2)
+
+            # 计算中点到全局起点和终点定义的直线的距离
+            x1, y1 = start_coord
+            x2, y2 = end_coord
+            x0, y0 = mid_point
+            num = abs((y2 - y1) * x0 - (x2 - x1) * y0 + x2 * y1 - y2 * x1)
+            den = ((y2 - y1) ** 2 + (x2 - x1) ** 2) ** 0.5
+            distance = num / den if den != 0 else float('inf')
+
+            # 初始化信息素，距离越近，信息素越高
+            self.pheromone[(source, target)] = 1 / (1 + distance)
+            self.pheromone[(target, source)] = 1 / (1 + distance)  # 如果是无向图，也为反向边初始化信息素
+
         print("Information pheromone initialization completed.")
-
-
-    def calculate_mid_point(self, start, end):
-        """
-        计算两点的中点。
-        """
-        if not (isinstance(start, (list, tuple)) and isinstance(end, (list, tuple))):
-            raise TypeError("start and end must be lists or tuples.")
-
-        return ((start[0] + end[0]) / 2, (start[1] + end[1]) / 2)
-
-    def calculate_distance_to_line(self, start, end, point):
-        """
-        计算点到直线的距离。
-
-        :param start: 直线的起点坐标。
-        :param end: 直线的终点坐标。
-        :param point: 需要计算到直线距离的点的坐标。
-        :return: 点到直线的距离。
-        """
-        # 验证输入参数
-        for param, name in [(start, 'start'), (end, 'end'), (point, 'point')]:
-            if not (isinstance(param, (list, tuple)) and len(param) == 2):
-                raise ValueError(f"参数{name}必须是包含两个元素的列表或元组，但得到: {param}")
-
-        x1, y1 = start
-        x2, y2 = end
-        x0, y0 = point
-
-        # 计算点到直线的距离
-        num = abs((y2 - y1) * x0 - (x2 - x1) * y0 + x2 * y1 - y2 * x1)
-        den = ((y2 - y1) ** 2 + (x2 - x1) ** 2) ** 0.5
-        distance = num / den if den != 0 else float('inf')
-
-        return distance
 
     def calculate_angle(self, node1, node2, node3):
         """
