@@ -107,16 +107,18 @@ class AntColonyOptimizer:
         """
         # 首先，选择全局起点和终点用于计算直线，这部分不变
         start_id, end_id = self.select_start_end_points()
-        start_coord = self.graph.nodes[start_id]['coord']  # 起点坐标
-        end_coord = self.graph.nodes[end_id]['coord']  # 终点坐标
+
+        # 确保起点和终点坐标是数值类型
+        start_coord = tuple(map(float, self.graph.nodes[start_id]['coord'].strip("()").split(", ")))
+        end_coord = tuple(map(float, self.graph.nodes[end_id]['coord'].strip("()").split(", ")))
 
         # 然后，遍历图中的所有边，针对每条边计算中点并初始化信息素
         for edge in self.graph.edges(data=True):
             source, target = edge[:2]  # 获取边的两个端点的ID
 
-            # 从图中获取端点坐标
-            source_coord = self.graph.nodes[source]['coord']
-            target_coord = self.graph.nodes[target]['coord']
+            # 从图中获取端点坐标，确保坐标是数值类型
+            source_coord = tuple(map(float, self.graph.nodes[source]['coord'].strip("()").split(", ")))
+            target_coord = tuple(map(float, self.graph.nodes[target]['coord'].strip("()").split(", ")))
 
             # 计算边的中点
             mid_point = ((source_coord[0] + target_coord[0]) / 2, (source_coord[1] + target_coord[1]) / 2)
