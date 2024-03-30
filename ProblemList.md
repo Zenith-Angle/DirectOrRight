@@ -107,3 +107,9 @@ graph.
 
 # time:2024/3/30 
 目前，对于选择的线路的起点终点和初始化信息素时的每条线段的起点终点，有混淆，需要做出区分
+
+# time:2024/3/30 21:19
+将initialize_pheromone，calculate_mid_point，calculate_distance_to_line进行了整合
+
+# time:2024/3/30 21:35
+我似乎完成了信息素的初始化部分的正常运行
