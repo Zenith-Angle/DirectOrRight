@@ -75,8 +75,6 @@ class AntColonyOptimizer:
         self.intersection_index, self.edge_data = create_intersection_index(graph)
         self.pheromone = {}
 
-
-
         # 在这里调用 initialize_pheromone 方法
         self.initialize_pheromone()
 
@@ -132,8 +130,8 @@ class AntColonyOptimizer:
             distance = num / den if den != 0 else float('inf')
 
             # 初始化信息素，距离越近，信息素越高
-            self.pheromone[(source, target)] = 1 / (1 + distance)
-            self.pheromone[(target, source)] = 1 / (1 + distance)  # 如果是无向图，也为反向边初始化信息素
+            self.pheromone[(source, target)] = (1 / (1 + distance)) * 10000
+            self.pheromone[(target, source)] = (1 / (1 + distance)) * 10000  # 如果是无向图，也为反向边初始化信息素
 
         print("Information pheromone initialization completed.")
 
@@ -229,7 +227,6 @@ class AntColonyOptimizer:
             if current_node == end_id:
                 break  # 如果到达终点，终止循环
         return path, total_duration  # 返回路径（ID列表）
-
 
     def select_next_node(self, current_node_id, path, traffic_mode):
         neighbors = list(self.graph.neighbors(current_node_id))
@@ -372,7 +369,7 @@ if __name__ == "__main__":
     G = read_graphml_with_keys('data/PAR.graphml', ['d0', 'd1'])
 
     # 创建蚁群优化器实例
-    aco = AntColonyOptimizer(G, num_ants=50, evaporation_rate=0.25, iterations=100)
+    aco = AntColonyOptimizer(G, num_ants=100, evaporation_rate=0.1, iterations=100)
 
     # 从图中随机选择起点和终点
     start, end = aco.select_start_end_points()
