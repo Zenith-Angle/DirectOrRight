@@ -49,6 +49,8 @@ class TimeRecorder:
         :param edge_length: 边的长度（米）。
         :return: 行驶时间（小时）。
         """
+        edge_length = float(edge_length)
+
         speed = 40000.0 / 60 # 假设速度（米/小时），注意单位转换
         return edge_length / speed
 
@@ -82,39 +84,18 @@ class TimeRecorder:
         return total_wait_time
 
     def simulate_path(self, path, graph):
-        """
-        模拟路径并计算总行驶时间和总等待时间。
-        """
-        self.reset_relative_time()  # 重置相对时间
         total_travel_time = 0
         total_wait_time = 0
 
-        nodes = list(graph.nodes())  # 获取图中的所有节点标识
-
         for i in range(len(path) - 1):
-            # 将路径中的索引转换为节点标识
-            start_node = nodes[path[i]]
-            end_node = nodes[path[i + 1]]
-
-            # 验证边是否存在
-            if end_node not in graph[start_node]:
-                continue  # 如果边不存在，则跳过
-
-            # 计算行驶时间
-            edge_length = graph[start_node][end_node]['length']
+            start_node_id = path[i]
+            end_node_id = path[i + 1]
+            edge_length = graph.edges[start_node_id, end_node_id]['length']
             travel_time = self.calculate_travel_time(edge_length)
             total_travel_time += travel_time
-
-            # 更新相对时间并记录行驶时间
             self.update_relative_time(travel_time)
-            self.record_passing_time(path[i + 1])
-
-            # 计算并记录等待时间（如果有）
-            wait_time = self.calculate_wait_time(path[i + 1])
+            wait_time = self.calculate_wait_time(end_node_id)
             total_wait_time += wait_time
-
-            # 更新相对时间
-            self.update_relative_time(wait_time)
 
         return total_travel_time, total_wait_time
 
