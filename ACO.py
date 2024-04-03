@@ -135,6 +135,11 @@ class AntColonyOptimizer:
 
         print("Information pheromone initialization completed.")
 
+        # Write pheromone levels to a file
+        with open(r'D:\python\DirectOrRight\log\pheromone.txt', 'w') as f:
+            for edge, pheromone in self.pheromone.items():
+                f.write(f"Edge: {edge};Pheromone: {pheromone}\n")
+
     def calculate_angle(self, node1, node2, node3):
         """
         计算由三个节点形成的两条道路之间的夹角。
@@ -201,6 +206,9 @@ class AntColonyOptimizer:
             # 判断是否是直行或右转
             return 160 <= angle <= 180 or 80 <= angle <= 100  # 这里的角度范围可以根据实际情况调整
 
+
+
+
     def find_path(self, start_id, end_id, traffic_mode):
         """
         对于每只蚂蚁寻找从起点到终点的路径。
@@ -240,7 +248,7 @@ class AntColonyOptimizer:
             pheromone_level = self.pheromone.get((current_node_id, neighbor_id), 1.0)
             pheromone_list.append(pheromone_level)
 
-            if self.can_turn(current_node_id, neighbor_id, traffic_mode, path):
+            if self.can_turn(current_node_id, neighbor_id, traffic_mode, path) and neighbor_id not in path:
                 edge_length = float(self.graph.edges[current_node_id, neighbor_id]['length'])
                 travel_time = self.time_recorder.calculate_travel_time(edge_length)
                 self.time_recorder.update_relative_time(travel_time)  # 更新相对时间
@@ -268,6 +276,8 @@ class AntColonyOptimizer:
         # 选择下一个节点
         next_node_id = random.choices(neighbors, weights=probabilities, k=1)[0]
         return next_node_id, durations[neighbors.index(next_node_id)]
+
+
 
     def estimate_wait_time(self, current_node, next_node):
         """
@@ -305,6 +315,7 @@ class AntColonyOptimizer:
                     best_duration = total_duration
 
             self.update_pheromone(iteration_paths, iteration_durations)
+
 
         if first_path_found:
             print(f"First path found: {first_path_found['path']}")
@@ -369,7 +380,7 @@ if __name__ == "__main__":
     G = read_graphml_with_keys('data/PAR.graphml', ['d0', 'd1'])
 
     # 创建蚁群优化器实例
-    aco = AntColonyOptimizer(G, num_ants=100, evaporation_rate=0.1, iterations=100)
+    aco = AntColonyOptimizer(G, num_ants=10, evaporation_rate=0.1, iterations=1000)
 
     # 从图中随机选择起点和终点
     start, end = aco.select_start_end_points()
