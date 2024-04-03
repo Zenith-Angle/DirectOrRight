@@ -101,7 +101,7 @@ class AntColonyOptimizer:
 
     def initialize_pheromone(self):
         """
-        在所有边上初始化信息素。
+        在所有边上初始化信息素，使信息素的分布更加平滑。
         """
         # 首先，选择全局起点和终点用于计算直线，这部分不变
         start_id, end_id = self.select_start_end_points()
@@ -109,6 +109,10 @@ class AntColonyOptimizer:
         # 确保起点和终点坐标是数值类型
         start_coord = tuple(map(float, self.graph.nodes[start_id]['coord'].strip("()").split(", ")))
         end_coord = tuple(map(float, self.graph.nodes[end_id]['coord'].strip("()").split(", ")))
+
+        # 引入最小信息素值
+        min_pheromone = 0 #这个值可以根据需要进行调整
+
 
         # 然后，遍历图中的所有边，针对每条边计算中点并初始化信息素
         for edge in self.graph.edges(data=True):
@@ -129,11 +133,11 @@ class AntColonyOptimizer:
             den = ((y2 - y1) ** 2 + (x2 - x1) ** 2) ** 0.5
             distance = num / den if den != 0 else float('inf')
 
-            # 初始化信息素，距离越近，信息素越高
-            self.pheromone[(source, target)] = (1 / (1 + distance)) * 10000
-            self.pheromone[(target, source)] = (1 / (1 + distance)) * 10000  # 如果是无向图，也为反向边初始化信息素
+            # 使用与距离成比例的函数来初始化信息素，确保分布更加平滑
+            self.pheromone[(source, target)] = max(min_pheromone, 10000 / (1 + distance))
+            self.pheromone[(target, source)] = max(min_pheromone, 10000 / (1 + distance))  # 如果是无向图，也为反向边初始化信息素
 
-        print("Information pheromone initialization completed.")
+        print("信息素初始化完成。")
 
         # Write pheromone levels to a file
         with open(r'D:\python\DirectOrRight\log\pheromone.txt', 'w') as f:
@@ -238,44 +242,42 @@ class AntColonyOptimizer:
 
     def select_next_node(self, current_node_id, path, traffic_mode):
         neighbors = list(self.graph.neighbors(current_node_id))
-        probabilities = []
-        durations = []
+        pheromone_levels = []
+        travel_times = []
 
-        # 收集信息素和时长
-        pheromone_list = []
+        valid_neighbors = []  # 存储符合条件的邻居节点ID
+
         for neighbor_id in neighbors:
-            # 如果键不存在于self.pheromone中，就为该键赋一个默认值
-            pheromone_level = self.pheromone.get((current_node_id, neighbor_id), 1.0)
-            pheromone_list.append(pheromone_level)
-
             if self.can_turn(current_node_id, neighbor_id, traffic_mode, path) and neighbor_id not in path:
+                # 获取信息素水平
+                pheromone_level = self.pheromone.get((current_node_id, neighbor_id), 1.0)
+                pheromone_levels.append(pheromone_level)
+                valid_neighbors.append(neighbor_id)
+
+                # 获取边的长度，并根据长度计算旅行时间
                 edge_length = float(self.graph.edges[current_node_id, neighbor_id]['length'])
                 travel_time = self.time_recorder.calculate_travel_time(edge_length)
-                self.time_recorder.update_relative_time(travel_time)  # 更新相对时间
-                wait_time = self.time_recorder.calculate_wait_time(neighbor_id)
-                total_duration = travel_time + wait_time
-                durations.append(total_duration)
+                travel_times.append(travel_time)
             else:
-                durations.append(float('inf'))
+                pheromone_levels.append(0)  # 对于不可达或已在路径中的邻居节点，信息素水平为0
 
-        # 信息素归一化和概率计算的部分保持不变
-        total_pheromone = sum(pheromone_list)
-        normalized_pheromones = [pheromone / total_pheromone for pheromone in pheromone_list]
-
-        for i, neighbor_id in enumerate(neighbors):
-            if durations[i] != float('inf'):
-                probability = normalized_pheromones[i] / durations[i] if durations[i] else 0
-                probabilities.append(probability)
-            else:
-                probabilities.append(0)
-
-        # 如果所有概率都为零，则返回None和无穷大
-        if all(prob == 0 for prob in probabilities):
+        # 如果没有有效的邻居节点，返回None
+        if not valid_neighbors:
             return None, float('inf')
 
-        # 选择下一个节点
-        next_node_id = random.choices(neighbors, weights=probabilities, k=1)[0]
-        return next_node_id, durations[neighbors.index(next_node_id)]
+        #print(f"pheromone_levels: {pheromone_levels}, travel_times: {travel_times}")
+
+        # 根据信息素水平和旅行时间计算权重
+        # 这里我们使用信息素水平与旅行时间的倒数的乘积作为权重，以促使选择信息素高且旅行时间短的节点
+        weights = [pheromone / time if time > 0 else 0 for pheromone, time in zip(pheromone_levels, travel_times)]
+        total_weight = sum(weights)
+        probabilities = [weight / total_weight for weight in weights] if total_weight > 0 else [1.0 / len(
+            weights)] * len(weights)
+
+        next_node_id = random.choices(valid_neighbors, weights=probabilities, k=1)[0]
+        # 返回下一个节点ID及其旅行时间
+        next_node_index = valid_neighbors.index(next_node_id)
+        return next_node_id, travel_times[next_node_index]
 
 
 
