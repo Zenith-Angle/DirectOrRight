@@ -210,35 +210,47 @@ class AntColonyOptimizer:
             # 判断是否是直行或右转
             return 160 <= angle <= 180 or 80 <= angle <= 100  # 这里的角度范围可以根据实际情况调整
 
-
-
-
     def find_path(self, start_id, end_id, traffic_mode):
         """
-        对于每只蚂蚁寻找从起点到终点的路径。
+        查找从起点到终点的路径及其总时长。
 
-        :param start_id: 路径的起点ID。
-        :param end_id: 路径的终点ID。
-        :param traffic_mode: 交通模式。
-        :return: 路径列表和总时长。
+        :param start_id: 起点的ID
+        :param end_id: 终点的ID
+        :param traffic_mode: 交通模式（例如：驾驶、步行等）
+        :return: 返回一个包含路径（ID列表）和总时长的元组
         """
-        path = [start_id]  # 使用起点ID初始化路径
-        current_node = start_id  # 当前节点为起始节点
+        path = [start_id]  # 初始化路径列表，起点为第一个节点
+        current_node = start_id  # 当前节点设置为起点
 
-        total_duration = 0  # 总时长，包括行驶时间和路口等待时间
+        total_duration = 0  # 初始化总时长，包括行驶时间和等待时间
         max_iterations = 100  # 设置最大迭代次数以避免无限循环
 
         for _ in range(max_iterations):
+            # 选择下一个节点，并计算到达该节点的时间
             next_node, duration = self.select_next_node(current_node, path, traffic_mode)
             if next_node is None or next_node == current_node:
-                # 如果无法找到新的节点或返回到相同的节点，终止搜索
+                # 如果无法找到可行的下一个节点或回到相同节点，则终止搜索
                 break
-            path.append(next_node)  # 添加节点的ID到路径中
+            path.append(next_node)  # 将下一个节点添加到路径中
             total_duration += duration  # 累加总时长
             current_node = next_node  # 更新当前节点
             if current_node == end_id:
-                break  # 如果到达终点，终止循环
-        return path, total_duration  # 返回路径（ID列表）
+                break  # 如果到达终点，则终止循环
+
+            # 检查是否进入死胡同
+            neighbors = list(self.graph.neighbors(current_node))
+            if len(neighbors) == 1 and neighbors[0] == path[-2]:  # 如果当前节点只有一个邻居，且这个邻居是前一个节点
+                # 回溯到上一个节点
+                path.pop()
+                current_node = path[-1]
+                total_duration -= duration  # 减去回溯的时间
+
+                # 将死胡同点的信息素归零
+                for edge in self.pheromone:
+                    if next_node in edge:
+                        self.pheromone[edge] = 0
+
+        return path, total_duration  # 返回找到的路径和总时长
 
     def select_next_node(self, current_node_id, path, traffic_mode):
         neighbors = list(self.graph.neighbors(current_node_id))
@@ -377,7 +389,7 @@ if __name__ == "__main__":
     G = read_graphml_with_keys('data/PAR.graphml', ['d0', 'd1'])
 
     # 创建蚁群优化器实例
-    aco = AntColonyOptimizer(G, num_ants=1000, evaporation_rate=0.25, iterations=1000)
+    aco = AntColonyOptimizer(G, num_ants=100, evaporation_rate=0.2, iterations=100)
 
     # 从图中随机选择起点和终点
     start, end = aco.select_start_end_points()
