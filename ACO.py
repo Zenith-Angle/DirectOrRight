@@ -255,30 +255,27 @@ class AntColonyOptimizer:
     def select_next_node(self, current_node_id, path, traffic_mode):
         neighbors = list(self.graph.neighbors(current_node_id))
         valid_neighbors = []  # 存储符合条件的邻居节点ID
-        pheromone_levels = []
-        travel_times = []
+        weights = []
 
         for neighbor_id in neighbors:
             if self.can_turn(current_node_id, neighbor_id, traffic_mode, path) and neighbor_id not in path:
                 # 获取信息素水平
                 pheromone_level = self.pheromone.get((current_node_id, neighbor_id), 1.0)
-                valid_neighbors.append(neighbor_id)
-                pheromone_levels.append(pheromone_level)
 
                 # 获取边的长度，并根据长度计算旅行时间
                 edge_length = float(self.graph.edges[current_node_id, neighbor_id]['length'])
                 travel_time = self.time_recorder.calculate_travel_time(edge_length)
-                travel_times.append(travel_time)
-            else:
-                # 对于不可达或已在路径中的邻居节点，信息素水平为0，旅行时间设置为无穷大，以确保不被选择
-                travel_times.append(float('inf'))
+
+                # 计算权重并添加到列表中
+                weight = pheromone_level / travel_time
+                weights.append(weight)
+                valid_neighbors.append(neighbor_id)
 
         # 如果没有有效的邻居节点，返回None
         if not valid_neighbors:
             return None, float('inf')
 
-        # 使用信息素水平与旅行时间的倒数的乘积作为权重，以促使选择信息素高且旅行时间短的节点
-        weights = [pheromone / time for pheromone, time in zip(pheromone_levels, travel_times)]
+        # 计算概率
         total_weight = sum(weights)
         probabilities = [weight / total_weight for weight in weights] if total_weight > 0 else [1.0 / len(
             weights)] * len(weights)
@@ -286,7 +283,7 @@ class AntColonyOptimizer:
         # 根据概率选择下一个节点ID及其旅行时间
         next_node_id = random.choices(valid_neighbors, weights=probabilities, k=1)[0]
         next_node_index = valid_neighbors.index(next_node_id)
-        return next_node_id, travel_times[next_node_index]
+        return next_node_id, 1 / (weights[next_node_index] + 1e-10)  # Add a small constant to avoid division by zero
 
     def estimate_wait_time(self, current_node, next_node):
         """
@@ -389,7 +386,7 @@ if __name__ == "__main__":
     G = read_graphml_with_keys('data/PAR.graphml', ['d0', 'd1'])
 
     # 创建蚁群优化器实例
-    aco = AntColonyOptimizer(G, num_ants=100, evaporation_rate=0.2, iterations=100)
+    aco = AntColonyOptimizer(G, num_ants=10, evaporation_rate=0.2, iterations=100)
 
     # 从图中随机选择起点和终点
     start, end = aco.select_start_end_points()
